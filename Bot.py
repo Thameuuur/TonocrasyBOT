@@ -55,37 +55,58 @@ async def process_dao_purpose(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['dao_purpose'] = message.text
 
-    await message.reply(f"{data['dao_purpose']} is a noble purpose indeed! Will you be the only council for the moment? Please answer Yes or No.")
+    await message.reply(f"{data['dao_purpose']} is a noble purpose indeed! For the moment you will be the only council ! Please reply with OK")
     await Form.is_council.set()
 
 # Define the is_council handler
 @dp.message_handler(state=Form.is_council)
 async def process_is_council(message: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['is_council'] = message.text.lower() in ['yes', 'y']
+    if message.text.lower() in ['ok', 'k']:
+        is_council = True
+    else:
+        await message.reply("Sorry, I didn't understand your response. Please answer with OK.")
+        process_is_council(message.text.lower(), state)
 
-    await message.reply("Got it! Will you allow the community to add any kind of proposals? Please answer Yes or No.")
+    async with state.proxy() as data:
+        data['is_council'] = is_council
+    await message.reply("Thanks! Will you allow the community to add proposals? Please answer Yes or No.")
     await Form.allow_proposals.set()
 
 # Define the allow_proposals handler
 @dp.message_handler(state=Form.allow_proposals)
 async def process_allow_proposals(message: types.Message, state: FSMContext):
-        async with state.proxy() as data:
-            data['allow_proposals'] = message.text.lower() in ['yes', 'y']
-
-        await message.reply("Thanks! Will you allow the community to vote on proposals? Please answer Yes or No.")
-        await Form.allow_voting.set()
+    async with state.proxy() as data:
+        if message.text.lower() in ['yes', 'y', '']:
+            data['allow_proposals'] = True
+            await message.reply("Thanks! this will allow the community to add any kind of proposal, will they vote on them ?  Please answer Yes or No.")
+            await Form.allow_voting.set()
+        elif message.text.lower() in ['no', 'n']:
+            data['allow_proposals'] = False
+            await message.reply("Thanks! this won't allow the community to add any kind of proposal, will they vote on them ?  Please answer Yes or No.")
+            await Form.allow_voting.set()
+        else:
+            await message.reply("Sorry, I didn't understand your response. Please answer Yes or No.")
+            process_allow_proposals(message.text.lower(), state)
 
 # Define the allow_voting handler
 @dp.message_handler(state=Form.allow_voting)
 async def process_allow_voting(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
-        data['allow_voting'] = message.text.lower() in ['yes', 'y']
+        if message.text.lower() in ['yes', 'y', '']:
+            data['allow_voting'] = True
+            reply = f"Thanks! this will allow the community to to vote any kind of proposal\nSo, here's what I got:\n\nName: {data['name']}\nDAO Name: {data['dao_name']}\nPurpose: {data['dao_purpose']}\nOnly Council: {'Yes' if data['is_council'] else 'No'}\nAllow Proposals: {'Yes' if data['allow_proposals'] else 'No'}\nAllow Voting: {'Yes' if data['allow_voting'] else 'No'}\n\nIs this correct? Please answer Yes or No."
+            await message.reply(reply, parse_mode=ParseMode.MARKDOWN)
+            await Form.confirm_data.set()
+        elif message.text.lower() in ['no', 'n']:
+            data['allow_voting'] = False
+            reply = f"Thanks! this won't allow the community to vote to any kind of proposal\nSo, here's what I got:\n\nName: {data['name']}\nDAO Name: {data['dao_name']}\nPurpose: {data['dao_purpose']}\nOnly Council: {'Yes' if data['is_council'] else 'No'}\nAllow Proposals: {'Yes' if data['allow_proposals'] else 'No'}\nAllow Voting: {'Yes' if data['allow_voting'] else 'No'}\n\nIs this correct? Please answer Yes or No."
+            await message.reply(reply, parse_mode=ParseMode.MARKDOWN)
+            await Form.confirm_data.set()
+        else:
+            await message.reply("Sorry, I didn't understand your response. Please answer Yes or No.")
+            process_allow_voting(message.text.lower(), state)
 
-    # Ask the user to confirm their input
-    reply = f"Thanks for providing your information. Here's what I got:\n\nName: {data['name']}\nDAO Name: {data['dao_name']}\nPurpose: {data['dao_purpose']}\nOnly Council: {'Yes' if data['is_council'] else 'No'}\nAllow Proposals: {'Yes' if data['allow_proposals'] else 'No'}\nAllow Voting: {'Yes' if data['allow_voting'] else 'No'}\n\nIs this correct? Please answer Yes or No."
-    await message.reply(reply, parse_mode=ParseMode.MARKDOWN)
-    await Form.confirm_data.set()
+    
 
 # Define the confirm_data handler
 @dp.message_handler(state=Form.confirm_data)
